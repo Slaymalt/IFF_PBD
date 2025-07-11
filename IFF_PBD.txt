@@ -1,0 +1,429 @@
+﻿SELECT COUNT(*) AS full_flights_count
+FROM avia.flights f
+WHERE f.flight_id < 400
+AND IsFlightFull(f.flight_id) = 0;
+
+
+SELECT COUNT(*) AS full_flights_count
+FROM avia.flights f
+WHERE IsFlightFull(f.flight_id) = 1
+AND TO_TIMESTAMP(f.scheduled_departure, 'DD.MM.YY HH24:MI:SS,FF')
+    BETWEEN TO_TIMESTAMP('04.07.17', 'DD.MM.YY') 
+    AND TO_TIMESTAMP('05.08.17', 'DD.MM.YY');
+
+
+  FUNCTION IsFlightFull (
+        id_flight    NUMBER) 
+        RETURN number IS
+        v_renge number;
+        v_renge2 number;
+    BEGIN
+      SELECT COUNT(b.TICKET_NO) INTO V_RENGE 
+      FROM AVIA.ticket_flights B 
+      WHERE B.FLIGHT_ID = ID_FLIGHT;
+      
+            SELECT A.RANGE INTO v_renge2
+            FROM AVIA.AIRCRAFTS_DATA A, AVIA.FLIGHTS F 
+            WHERE A.AIRCRAFT_CODE = F.AIRCRAFT_CODE 
+            AND id_flight = F.FLIGHT_ID;
+      
+            IF V_RENGE < v_renge2 THEN
+        RETURN 1;
+      ELSE
+        RETURN 0;
+      END IF;
+  END IsFlightFull;
+   
+  FUNCTION GetAvailableFlights (
+        DATE_F    DATE,
+        CITY_b VARCHAR2)     
+    RETURN flightsList IS
+    V_FLIGHTS flightsList := flightsList();
+    BEGIN
+            SELECT FLIGHT_ID bulk collect into V_FLIGHTS
+            FROM AVIA.FLIGHTS F, AVIA.AIRPORTS_DATA A 
+            WHERE (City_b = SUBSTR(A.CITY, 1, INSTR(A.CITY, '/') - 1)) AND A.AIRPORT_CODE = F.ARRIVAL_AIRPORT
+            AND TRUNC(date_f) = TRUNC(F.SCHEDULED_DEPARTURE);
+            
+            RETURN V_FLIGHTS;    
+  END GetAvailableFlights;
+
+
+
+
+FUNCTION AirportsCity (
+      city_a    VARCHAR2) 
+      RETURN varchar2 IS
+      
+        v_names VARCHAR2(4000); -- Максимальная длина строки
+        BEGIN
+            SELECT LISTAGG(SUBSTR(a.airport_name, 1, INSTR(a.airport_name, '/') - 1), ', ') WITHIN GROUP (ORDER BY a.airport_name)
+            INTO v_names
+            FROM AVIA.AIRPORTS_DATA a 
+            WHERE SUBSTR(a.city, 1, INSTR(a.city, '/') - 1) = city_a;
+        
+            RETURN v_names;
+    END AirportsCity;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+FUNCTION GetAvailableFlights return sys_refcursor is
+rc sys_refcursor;
+begin
+  open rc for
+    select distinct fl.flight_id, s.seat_no, fl.status
+    from avia.flights fl
+    join avia.aircrafts_data ad on ad.aircraft_code = fl.aircraft_code
+    join avia.seats s on s.aircraft_code = ad.aircraft_code
+    left join avia.boarding_passes bp on bp.seat_no = s.seat_no
+    where bp.seat_no is null and  fl.flight_id = bp.flight_id and fl.status not in 
+    ('Cancelled', 'Departed', 'Arrived');
+  return rc;
+END GetAvailableFlights;
+
+
+FUNCTION GetFlightDetails (flightId INTEGER) return sys_refcursor is
+rc1 sys_refcursor;
+begin
+  open rc1 for
+    select fl.flight_id, fl.scheduled_departure, fl.scheduled_arrival, 
+      ap.airport_name as departure_airport_name, ap1.airport_name as arrival_airport_name
+    from avia.flights fl
+    join avia.airports_data ap on ap.airport_code = fl.departure_airport
+    join avia.airports_data ap1 on ap1.airport_code = fl.arrival_airport
+    where fl.flight_id = :flightId;
+  return rc1;
+END GetFlightDetails;
+END BookingManagementPackage;
+
+
+create or replace FUNCTION GetAvailableFlights return sys_refcursor is
+rc sys_refcursor;
+begin
+  open rc for
+    select distinct fl.flight_id, s.seat_no, fl.status
+    from avia.flights fl
+    join avia.aircrafts_data ad on ad.aircraft_code = fl.aircraft_code
+    join avia.seats s on s.aircraft_code = ad.aircraft_code
+    left join avia.boarding_passes bp on bp.seat_no = s.seat_no
+    where bp.seat_no is null and  fl.flight_id = bp.flight_id and fl.status not in 
+    ('Cancelled', 'Departed', 'Arrived');
+  return rc;
+END;
+
+
+________________
+
+
+FUNCTION IsFlightAvailable(fl_id IN NUMBER, fare_con IN VARCHAR2, flight_date IN VARCHAR2) RETURN NUMBER AS
+            available_seats NUMBER;
+    BEGIN
+        SELECT COUNT(*) INTO available_seats
+        FROM avia.flights f
+        JOIN avia.ticket_flights tf ON tf.flight_id = f.flight_id
+        WHERE (f.flight_id = fl_id
+        AND TO_TIMESTAMP(f.scheduled_departure, 'DD.MM.YY HH24:Mi:SS,FF') = TO_TIMESTAMP(flight_date, 'DD.MM.YY HH24:Mi:SS,FF')
+        AND tf.fare_conditions = fare_con);
+                dbms_output.put_line( fare_con);
+        RETURN available_seats;
+    END IsFlightAvailable; 
+
+
+
+
+FUNCTION GetPassengerReservations(pas_id IN VARCHAR2) RETURN VARCHAR2 AS       
+        v_info VARCHAR2 (10000) := '';
+        v_book_ref VARCHAR2 (50);
+        v_book_date DATE;
+        v_total_amount NUMBER;
+        v_ticket_no VARCHAR2 (50);
+        v_passenger_name VARCHAR2 (50);
+        v_contact_data VARCHAR2 (50);
+    BEGIN        
+        FOR rec IN (SELECT b.book_ref, b.book_date, b.total_amount, t.ticket_no, t.passenger_name, t.contact_data
+                    FROM AVIA.Bookings b
+                    JOIN AVIA.Tickets t ON b.book_ref = t.book_ref
+                    WHERE t.passenger_id = pas_id)
+        LOOP
+            v_book_ref := rec.book_ref;
+            v_book_date := rec.book_date;
+            v_total_amount := rec.total_amount;
+            v_ticket_no := rec.ticket_no;
+            v_passenger_name := rec.passenger_name;
+            v_contact_data := rec.contact_data;
+            v_info := v_info || 'Booking Reference: ' || v_book_ref || ', Booking Date: ' || v_book_date || ', Total Amount: ' || v_total_amount || ', Ticket No: ' || v_ticket_no || ', Passenger Name: ' || v_passenger_name || ', Contact Data: ' || v_contact_data || CHR(10);
+        END LOOP;
+        RETURN v_info;
+    END GetPassengerReservations;   
+
+
+
+
+
+
+
+
+
+
+  FUNCTION GenerateTravelReport(start_date IN TIMESTAMP , END_date IN TIMESTAMP ) RETURN VARCHAR2 IS
+    v_report VARCHAR2(256);
+    rec number;
+  BEGIN
+    SELECT COUNT(DISTINCT t.passenger_id)
+    INTO v_report
+    FROM avia.Tickets t
+    JOIN avia.Ticket_flights tf ON t.ticket_no = tf.ticket_no
+    JOIN avia.Flights f ON tf.flight_id = f.flight_id
+    WHERE f.scheduled_departure BETWEEN start_date AND END_date;
+
+
+    FOR rec IN (select * from (
+      SELECT f.arrival_airport, COUNT(DISTINCT t.passenger_id) AS passengers_count
+      FROM avia.Tickets t
+      JOIN avia.Ticket_flights tf ON t.ticket_no = tf.ticket_no
+      JOIN avia.Flights f ON tf.flight_id = f.flight_id
+      WHERE f.scheduled_departure BETWEEN start_date AND END_date
+      GROUP BY f.arrival_airport
+      ORDER BY passengers_count DESC) where rownum <4
+    ) LOOP
+    EXIT;
+      v_report := v_report ||  CHR(10) ||  'Destination: ' ||  rec.arrival_airport  || ', Passengers Count: ' ||  rec.passengers_count;
+    END LOOP;
+
+
+   FOR rec IN (
+     select * from (
+
+
+ SELECT departure_airport, COUNT(*) AS flights_count
+      FROM AVIA.flights 
+      WHERE status IN ('Delayed', 'Cancelled')
+      GROUP BY departure_airport
+    
+      ORDER BY flights_count DESC) where rownum <4
+    ) LOOP
+    EXIT;
+      v_report := v_report ||  CHR(10) ||  'Airport: ' ||  rec.departure_airport ||  ', Delayed/Cancelled Flights Count: ' ||  rec.flights_count;
+    END LOOP;
+
+
+    RETURN v_report;
+  END GenerateTravelReport;
+
+
+
+
+ 
+
+
+ FUNCTION GetAirportHistory(airport_id IN varchar2, start_date IN TIMESTAMP , END_date IN TIMESTAMP ) RETURN SYS_REFCURSOR IS
+    v_cursor SYS_REFCURSOR;
+  BEGIN
+    OPEN v_cursor FOR
+      SELECT
+        f.scheduled_departure AS planned_departure,
+        f.actual_departure,
+        f.arrival_airport,
+        CASE WHEN f.status IN ('Delayed', 'Cancelled') THEN 'YES'
+        WHEN f.status Is null THEN 'NO'
+        ELSE 'NO' END AS cancellation_status
+        
+      FROM avia.Flights f
+      WHERE f.departure_airport = airport_id
+        AND f.scheduled_departure BETWEEN start_date AND END_date
+      
+      ORDER BY f.scheduled_departure;
+
+
+    RETURN v_cursor;
+  END GetAirportHistory;
+
+
+
+
+
+
+FUNCTION IsSeatAvailable(in_id in flights.flight_id%TYPE, in_seat in seats.seat_no%TYPE) return number
+is 
+    v_temp number;
+    v_return number;  
+    v_max_seat_number number;
+    v_max_seat_letter varchar(2);
+begin
+    select count(*) into v_temp
+    from flights f, aircrafts_data a, seats s
+    where f.aircraft_code=a.aircraft_code and  a.aircraft_code=s.aircraft_code 
+    and in_id = flight_id and in_seat = seat_no;
+    
+    select max(to_number(substr(seat_no, 1,2))) into v_max_seat_number
+    from flights f, aircrafts_data a, seats s
+    where  f.aircraft_code=a.aircraft_code and  a.aircraft_code=s.aircraft_code  and length(seat_no) = 3 and in_id = flight_id;
+    
+    select max(substr(seat_no, -1)) into v_max_seat_letter
+    from flights f, aircrafts_data a, seats s
+    where  f.aircraft_code=a.aircraft_code and  a.aircraft_code=s.aircraft_code and in_id = flight_id;
+    
+    if length(in_seat) = 2 then
+       if substr(in_seat, -1) > v_max_seat_letter then
+            DBMS_OUTPUT.PUT_LINE('Места ' ||  in_seat || ' на рейсе ' || in_id || ' не существует.');
+       else
+            if v_temp > 0 then
+                v_return:=0;
+            else 
+                v_return:=1;
+            END if;
+      END if;
+     else if length(in_seat) = 3 then 
+        if to_number(substr(in_seat, 1,2)) > v_max_seat_number and  substr(in_seat, -1) > v_max_seat_letter then 
+            DBMS_OUTPUT.PUT_LINE('Места ' ||  in_seat || ' на рейсе ' || in_id || ' не существует.');
+       else
+            if v_temp > 0 then
+                v_return:=0;
+            else 
+                v_return:=1;
+       END if;
+     END if;
+      
+    else 
+      DBMS_OUTPUT.PUT_LINE('Места ' || in_seat || ' на рейсе ' || in_id || ' не существует.');
+    END if;
+    END if;
+    return v_return;  
+END IsSeatAvailable;
+
+
+
+
+
+
+
+
+
+
+FUNCTION GetPassengerBookings (pass_id tickets.passenger_id%TYPE) return varchar2
+is
+    G_vsego varchar2 (1024);
+begin
+    G_vsego:='';
+    for rec in (
+        select b.book_ref
+        from tickets t, bookings b 
+        where b.book_ref = t.book_ref and t.passenger_id = pass_id)
+    loop
+        G_vsego := G_vsego||rec.book_ref||';'; 
+    END loop;
+    if length(G_vsego) > 0 then
+        G_vsego := SUBSTR(G_vsego, 1, length(G_vsego) - 1);
+    END if;
+    return G_vsego;
+END GetPassengerBookings;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   FUNCTION GetDistanceKm(
+        airport_code1 VARCHAR2,
+        airport_code2 VARCHAR2
+    ) RETURN NUMBER IS
+        lon1 NUMBER;
+        lat1 NUMBER;
+        lon2 NUMBER;
+        lat2 NUMBER;
+        dist NUMBER;
+        pi CONSTANT NUMBER := ACOS(-1);
+    BEGIN
+        EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
+        SELECT 
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 1)),
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 2))
+        INTO lon1, lat1
+        FROM avia.airports_data
+        WHERE airport_code = airport_code1;
+        
+        SELECT 
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 1)),
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 2))
+        INTO lon2, lat2
+        FROM avia.airports_data
+        WHERE airport_code = airport_code2;
+        
+        dist := 6371 * ACOS(
+            COS(lat1 * pi / 180) * COS(lat2 * pi / 180) *
+            COS((lon2 - lon1) * pi / 180) +
+            SIN(lat1 * pi / 180) * SIN(lat2 * pi / 180)
+        );
+        RETURN dist;
+    END GetDistanceKm;
