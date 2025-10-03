@@ -1,0 +1,42 @@
+CREATE OR REPLACE FUNCTION IsSeatAvailable(in_passenger_id IN VARCHAR2, in_flight_id IN NUMBER, in_seat_no IN VARCHAR2) RETURN NUMBER
+
+IS
+	elem varchar2(100);
+	CURSOR cur IS
+	SELECT SEAT_NO FROM BOARDING_PASSES bp
+	WHERE bp.SEAT_NO = in_seat_no AND bp.FLIGHT_ID = in_flight_id;
+
+BEGIN
+	elem := '';
+	OPEN cur;
+		fetch cur into elem;
+	IF elem IS null THEN
+		RETURN 1;
+	ELSE
+		RETURN 0;
+	END IF;
+	close cur;
+	RETURN NULL;
+
+END IsSeatAvailable; 
+
+SELECT IsSeatAvailable('2125 227779', '7572', '14A') FROM dual;
+
+SELECT IsSeatAvailable('2125 227779', '30625', '2D') FROM dual;
+
+SELECT IsSeatAvailable('2125 227779', '1', '10A') FROM dual;
+
+SELECT *FROM BOARDING_PASSES bp
+	WHERE SEAT_NO = '14A' AND FLIGHT_ID = '7572'; -- есть
+
+SELECT FLIGHT_ID , seat_no FROM BOARDING_PASSES bp
+	WHERE FLIGHT_ID = 1
+	ORDER BY FLIGHT_ID , seat_no;
+
+SELECT *FROM BOARDING_PASSES bp
+	WHERE SEAT_NO = '10B' AND FLIGHT_ID = '1'; -- есть
+
+SELECT *FROM BOARDING_PASSES bp
+	WHERE SEAT_NO = '10A' AND FLIGHT_ID = '1'; -- отсутсвует значит можно юранировать
+
+n,y,n
