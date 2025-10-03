@@ -1,0 +1,22 @@
+CREATE OR REPLACE FUNCTION IsFlightAvailable(
+p_flight_id VARCHAR2,
+p_fare_conditions VARCHAR2,
+p_flight_date DATE
+) RETURN NUMBER
+IS
+v_available_tickets NUMBER;
+BEGIN
+SELECT COUNT(*) INTO v_available_tickets
+FROM ticket_flights tf, flights f WHERE tf.flight_id = f.flight_id
+AND TRUNC(f.scheduled_departure) = TRUNC(p_flight_date)
+AND tf.fare_conditions = p_fare_conditions
+AND f.flight_id = p_flight_id;
+
+RETURN v_available_tickets;
+
+EXCEPTION
+WHEN NO_DATA_FOUND THEN
+RETURN 0;
+END;
+
+SELECT IsFlightAvailable('2055','Economy','16.07.2017') FROM dual;
