@@ -1,0 +1,42 @@
+FUNCTION GetDistanceKm(
+        airport_code1 VARCHAR2,
+        airport_code2 VARCHAR2
+    ) RETURN NUMBER IS
+        lon1 NUMBER;
+        lat1 NUMBER;
+        lon2 NUMBER;
+        lat2 NUMBER;
+        dist NUMBER;
+        pi CONSTANT NUMBER := ACOS(-1);
+    BEGIN
+        EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
+        SELECT 
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 1)),
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 2))
+        INTO lon1, lat1
+        FROM airports_data
+        WHERE airport_code = airport_code1;
+        
+        SELECT 
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 1)),
+            TO_NUMBER(REGEXP_SUBSTR(coordinates, '[-0-9.]+', 1, 2))
+        INTO lon2, lat2
+        FROM airports_data
+        WHERE airport_code = airport_code2;
+        
+        dist := 6371 * ACOS(
+            COS(lat1 * pi / 180) * COS(lat2 * pi / 180) *
+            COS((lon2 - lon1) * pi / 180) +
+            SIN(lat1 * pi / 180) * SIN(lat2 * pi / 180)
+        );
+        RETURN dist;
+    END GetDistanceKm;
+
+BEGIN
+	DBMS_OUTPUT.PUT_LINE(GetDistanceKm(,));
+END;
+
+
+SELECT round(FlightManagementPackage.GetDistanceKm('SVO', 'VVO'),3) AS distance FROM dual;
+
+6534,y,n
