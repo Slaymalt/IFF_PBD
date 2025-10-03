@@ -1,0 +1,27 @@
+CREATE OR REPLACE FUNCTION IsFlightFull (no_id_flight VARCHAR2) RETURN NUMBER IS
+v_full NUMBER;
+no_aircraft_code VARCHAR2(10); -- Исправлен тип данных
+am_of_seats NUMBER;
+am_of_passes NUMBER;
+BEGIN
+
+SELECT aircraft_code INTO no_aircraft_code FROM flights WHERE flight_id = no_id_flight;
+
+SELECT count(*) INTO am_of_seats FROM seats WHERE aircraft_code = no_aircraft_code;
+
+SELECT count(*) INTO am_of_passes FROM BOARDING_PASSES WHERE flight_id = no_id_flight;
+
+IF am_of_seats = am_of_passes THEN
+v_full:=1;
+ELSE
+v_full:=0;
+END IF;
+RETURN v_full;
+
+END IsFlightFull;
+
+
+SELECT IsFlightFull(1185) from dual;
+
+SELECT count(*) from flights;
+WHERE flight_id<400 and IsFlightFull(flight_id)=1
